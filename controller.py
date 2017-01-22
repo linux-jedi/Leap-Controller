@@ -7,7 +7,7 @@ from Leap import CircleGesture, KeyTapGesture, ScreenTapGesture, SwipeGesture
 
 class SampleListener(Leap.Listener):
     def on_init(self, controller):
-        host = "ws://c08fe2af.ngrok.io/LeapPosition"
+        host = "ws://globe-sb.herokuapp.com/LeapPosition"
         self.ws = create_connection(host)
         print "Initialized"
 
