@@ -6,9 +6,13 @@ import Leap
 from Leap import CircleGesture, KeyTapGesture, ScreenTapGesture, SwipeGesture
 
 class SampleListener(Leap.Listener):
+    pollRate = 5
+    zoomLevel = 10
+
     def on_init(self, controller):
         host = "ws://globe-sb.herokuapp.com/LeapPosition"
         self.ws = create_connection(host)
+        self.counter = 0
         print "Initialized"
 
     def on_connect(self, controller):
@@ -28,7 +32,10 @@ class SampleListener(Leap.Listener):
 
         # Get hands
         for hand in frame.hands:
+            # Iterate counter
+            self.counter = self.counter + 1
 
+            # Configure Hands
             handType = "Left hand" if hand.is_left else "Right hand"
 
             # Get distance from leap to hand
@@ -37,17 +44,43 @@ class SampleListener(Leap.Listener):
             
             # Get the hand's normal vector
             normal = hand.palm_normal
-            x = -1 * normal.x
+            x = normal.x
             z = normal.z
 
-            # Send all data
-            sendTrackingData(distanceFromLeap, x, z, self.ws)
+            # Get hand velocity
+            delta = hand.palm_velocity.y
 
-def sendTrackingData(distance, x, y, ws):
+            # Polling Loop
+            if self.counter > self.pollRate:
+                # Update pan direction
+                direction = determineDirection(x,z)
+
+                # Update zoom amount
+                if abs(delta) > 55:
+                    print "Velocity: " + str(delta)
+                    self.zoomLevel = calculateZoom(delta, self.zoomLevel)
+                
+                sendTrackingData(self.zoomLevel, direction, self.ws)
+                self.counter = 0
+
+def calculateZoom(delta, currentZoom):
+    min = 1
+    max = 18
+
+    newZoom = currentZoom + (delta / 1000.0)
+    if newZoom >= max:
+        return max
+    elif newZoom <= min:
+        return min
+    
+    return newZoom
+
+
+def sendTrackingData(distance, direction, ws):
     jsonData = {}
-    jsonData["direction"] = determineDirection(x,y)
-    jsonData["position"] = transformPosition(distance)
-
+    jsonData["direction"] = direction
+    jsonData["position"] = distance
+    
     ws.send(json.dumps(jsonData))
     print jsonData
 
@@ -59,7 +92,7 @@ def determineDirection(x, y):
         return 0
 
     if abs(x) > abs(y):
-        if x >= 0:
+        if x <= 0:
             return 2
         else:
             return 4
